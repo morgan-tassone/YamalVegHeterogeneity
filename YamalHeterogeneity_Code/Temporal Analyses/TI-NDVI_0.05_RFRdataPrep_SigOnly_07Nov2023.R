@@ -1,0 +1,310 @@
+###################################TI-NDVI Random Forest Regression Prep Code##############################################
+setwd("~/UVA/MODIS Timeseries Project/Yamal Data")
+
+####Load datasets of slopes/values, combine with pixel IDs where needed. 
+TINDVI_SS <- readRDS(file = "TI-NDVI_0.05_Updated/UpdatedTINDVI_SigOnly_07Nov2023.RDS")
+TINDVI_SS_PIs <- subset(TINDVI_SS, select = -c(pval) )
+colnames(TINDVI_SS_PIs)[2] <- "TINDVI"
+
+CoastDist_PIs <- readRDS(file = "DistToCoast_Updated/CoastDist_tbl_09March2021.RDS")
+CoastDist_PIs <- subset(CoastDist_PIs, select = -c(x,y) )
+
+Elevation_PIs <- readRDS(file = "TanDEM/Elev_tbl_09March2021.RDS")
+Elevation_PIs <- subset(Elevation_PIs, select = -c(x,y) )
+
+HumanMod_PIs <- readRDS(file = "HumanMod/HumanMod_tbl_09March2021.RDS")
+HumanMod_PIs <- subset(HumanMod_PIs, select = -c(x,y) )
+
+LandAge_PIs <- readRDS(file = "Landscape Age/LandAge_tbl_09March2021.RDS")
+LandAge_PIs <- subset(LandAge_PIs, select = -c(x,y) )
+
+MGSP_SS <- readRDS(file = "MGSP_Updated/MGSP_Slope_10March2021.RDS")
+MGSP_PixelIDs <- readRDS(file = "MGSP_Updated/MGSP_Clean_Coords_08March2021.RDS")
+MGSP_SS_PIs <- cbind(MGSP_PixelIDs, MGSP_SS)
+MGSP_SS_PIs <- subset(MGSP_SS_PIs, select = -c(x,y) )
+colnames(MGSP_SS_PIs)[2] <- "MGSP"
+
+SFPO_SS <- readRDS(file = "SFPO_Updated/SFPO_Slope_10March2021.RDS")
+SFPO_PixelIDs <- readRDS(file = "SFPO_Updated/SFPO_Clean_Coords_09March2021.RDS")
+SFPO_SS_PIs <- cbind(SFPO_PixelIDs, SFPO_SS)
+SFPO_SS_PIs <- subset(SFPO_SS_PIs, select = -c(x,y) )
+colnames(SFPO_SS_PIs)[2] <- "SFPO"
+
+SM_SS <- readRDS(file = "SoilMoisture_Updated/SM_Slope_10March2021.RDS")
+SM_PixelIDs <- readRDS(file = "SoilMoisture_Updated/SM_Clean_Coords_09March2021.RDS")
+SM_SS_PIs <- cbind(SM_PixelIDs, SM_SS)
+SM_SS_PIs <- subset(SM_SS_PIs, select = -c(x,y) )
+colnames(SM_SS_PIs)[2] <- "SM"
+
+SoilText_PIs <- readRDS(file = "SoilTexture/SoilText_tbl_09March2021.RDS")
+colnames(SoilText_PIs)[2] <- "SoilTexture"
+
+SubChem_PIs <- readRDS(file = "Substrate pH/SubChem_tbl_09March2021.RDS")
+SubChem_PIs <- subset(SubChem_PIs, select = -c(x,y) )
+
+SWI_SS <- readRDS(file = "SWI_Updated/SWI_Slope_10March2021.RDS")
+SWI_PixelIDs <- readRDS(file = "SWI_Updated/SWI_Clean_Coords_08March2021.RDS")
+SWI_SS_PIs <- cbind(SWI_PixelIDs, SWI_SS)
+SWI_SS_PIs <- subset(SWI_SS_PIs, select = -c(x,y) )
+colnames(SWI_SS_PIs)[2] <- "SWI"
+
+VegType_PIs <- readRDS(file = "Veg Types/VegType_tbl_09March2021.RDS")
+VegType_PIs <- subset(VegType_PIs, select = -c(x,y) )
+
+#Remove NAs from tables and convert to dataframes
+TINDVI_SS_PIs <- na.omit(TINDVI_SS_PIs) #no change - NAs removed when creating timeseries 15 yrs +
+
+CoastDist_PIs <- na.omit(CoastDist_PIs)
+
+#For elevation, NAs = 0. Added 500 to pixel values to not exclude pixels with 0m elevation
+#Remove 0s, then subtract 500 from every value
+Elevation_PIs[Elevation_PIs == 0] <- NA
+Elevation_PIs <- na.omit(Elevation_PIs)
+Elevation_PIs$Elevation <- Elevation_PIs$Elevation - 500
+
+HumanMod_PIs <- na.omit(HumanMod_PIs)
+
+#For land age, NAs = 0. Added 500 to pixel values to not exclude pixels with 0 (recently disturbed) values
+#Remove 0s, then subtract 500 from every value
+LandAge_PIs[LandAge_PIs == 0] <- NA
+LandAge_PIs <- na.omit(LandAge_PIs)
+LandAge_PIs$LandAge <- LandAge_PIs$LandAge - 500
+
+MGSP_SS_PIs <- na.omit(MGSP_SS_PIs) #no change - NAs removed when creating timeseries 15 yrs +
+
+SFPO_SS_PIs <- na.omit(SFPO_SS_PIs) #no change - NAs removed when creating timeseries 15 yrs +
+
+SM_SS_PIs <- na.omit(SM_SS_PIs) #no change - NAs removed when creating timeseries 15 yrs +
+
+SoilText_PIs <- na.omit(SoilText_PIs)
+colnames(SoilText_PIs)[1] <- "PixelID"
+str(SoilText_PIs)
+#Convert the soil texture IDs into soil texture types
+SoilText_PIs$SoilTexture <- ifelse(SoilText_PIs$SoilTexture == 7021, "Sand", SoilText_PIs$SoilTexture)
+SoilText_PIs$SoilTexture <- ifelse(SoilText_PIs$SoilTexture == 8505 | SoilText_PIs$SoilTexture == 8510, "ClayLoam", SoilText_PIs$SoilTexture)
+SoilText_PIs$SoilTexture <- ifelse(SoilText_PIs$SoilTexture == 7944 | SoilText_PIs$SoilTexture == 7952 | SoilText_PIs$SoilTexture == 7952
+                                   | SoilText_PIs$SoilTexture == 8000 | SoilText_PIs$SoilTexture == 8099 | SoilText_PIs$SoilTexture == 8100 
+                                   | SoilText_PIs$SoilTexture == 8112 | SoilText_PIs$SoilTexture == 8118 | SoilText_PIs$SoilTexture == 8120
+                                   | SoilText_PIs$SoilTexture == 8123 | SoilText_PIs$SoilTexture == 8125 | SoilText_PIs$SoilTexture == 8126
+                                   | SoilText_PIs$SoilTexture == 8129 | SoilText_PIs$SoilTexture == 8133 | SoilText_PIs$SoilTexture == 8134
+                                   | SoilText_PIs$SoilTexture == 8140 | SoilText_PIs$SoilTexture == 8173 | SoilText_PIs$SoilTexture == 8174
+                                   | SoilText_PIs$SoilTexture == 8178 | SoilText_PIs$SoilTexture == 8179 | SoilText_PIs$SoilTexture == 8182
+                                   | SoilText_PIs$SoilTexture == 8195 | SoilText_PIs$SoilTexture == 8198 | SoilText_PIs$SoilTexture == 8239
+                                   | SoilText_PIs$SoilTexture == 8348 | SoilText_PIs$SoilTexture == 8351 | SoilText_PIs$SoilTexture == 9073, 
+                                   "Loam", SoilText_PIs$SoilTexture)
+SoilText_PIs$SoilTexture <- ifelse(SoilText_PIs$SoilTexture == 7061 | SoilText_PIs$SoilTexture == 8495 | SoilText_PIs$SoilTexture == 9008, 
+                                   "SandyLoam", SoilText_PIs$SoilTexture)
+SoilText_PIs$SoilTexture <- ifelse(SoilText_PIs$SoilTexture == 7073 | SoilText_PIs$SoilTexture == 8965 | SoilText_PIs$SoilTexture == 9027
+                                   | SoilText_PIs$SoilTexture == 9030 | SoilText_PIs$SoilTexture == 9046 | SoilText_PIs$SoilTexture == 9059 
+                                   | SoilText_PIs$SoilTexture == 9064 | SoilText_PIs$SoilTexture == 9069 | SoilText_PIs$SoilTexture == 9074
+                                   | SoilText_PIs$SoilTexture == 9097 | SoilText_PIs$SoilTexture == 9108 | SoilText_PIs$SoilTexture == 9114
+                                   | SoilText_PIs$SoilTexture == 9118 | SoilText_PIs$SoilTexture == 9119 | SoilText_PIs$SoilTexture == 9134
+                                   | SoilText_PIs$SoilTexture == 9148 | SoilText_PIs$SoilTexture == 9170 | SoilText_PIs$SoilTexture == 9177
+                                   | SoilText_PIs$SoilTexture == 9181 | SoilText_PIs$SoilTexture == 9182 | SoilText_PIs$SoilTexture == 9195
+                                   | SoilText_PIs$SoilTexture == 9202, 
+                                   "SiltLoam", SoilText_PIs$SoilTexture)
+
+#For sub chem, NAs = 0
+SubChem_PIs[SubChem_PIs == 0] <- NA
+SubChem_PIs <- na.omit(SubChem_PIs)
+#Convert sub chem IDs into categories
+SubChem_PIs$SubChem <- ifelse(SubChem_PIs$SubChem == 2, "Acidic", SubChem_PIs$SubChem)
+SubChem_PIs$SubChem <- ifelse(SubChem_PIs$SubChem == 3, "Circum", SubChem_PIs$SubChem)
+SubChem_PIs$SubChem <- ifelse(SubChem_PIs$SubChem == 5, "Saline", SubChem_PIs$SubChem)
+
+SWI_SS_PIs <- na.omit(SWI_SS_PIs) #no change - NAs removed when creating timeseries 15 yrs +
+
+#For veg type, NAs = 0
+VegType_PIs[VegType_PIs == 0] <- NA
+VegType_PIs <- na.omit(VegType_PIs)
+#Convert Veg Types into categories (based on Raynolds et al. 2006)
+VegType_PIs$VegType <- ifelse(VegType_PIs$VegType == 2, "Graminoid", VegType_PIs$VegType)
+VegType_PIs$VegType <- ifelse(VegType_PIs$VegType == 12, "Wetland", VegType_PIs$VegType)
+VegType_PIs$VegType <- ifelse(VegType_PIs$VegType == 5, "Graminoid", VegType_PIs$VegType)
+VegType_PIs$VegType <- ifelse(VegType_PIs$VegType == 9, "ErectShrub", VegType_PIs$VegType)
+VegType_PIs$VegType <- ifelse(VegType_PIs$VegType == 7, "Graminoid", VegType_PIs$VegType)
+VegType_PIs$VegType <- ifelse(VegType_PIs$VegType == 4, "ProstrateShrub", VegType_PIs$VegType)
+VegType_PIs$VegType <- ifelse(VegType_PIs$VegType == 10, "ErectShrub", VegType_PIs$VegType)
+VegType_PIs$VegType <- ifelse(VegType_PIs$VegType == 13, "Wetland", VegType_PIs$VegType)
+VegType_PIs$VegType <- ifelse(VegType_PIs$VegType == 14, "Wetland", VegType_PIs$VegType)
+#Remove 19, associated with water
+library(dplyr)
+VegType_PIs = filter(VegType_PIs, VegType != 19)
+
+#Need each dataset to have the same number of data points and data associated with the same pixels
+#Start with TI-NDVI, which has the fewest pixels (42,868)
+#Remove pixel IDs from dataframes NOT present in the TI-NDVI dataframe, and vice versa.
+CoastDist_v1 <- CoastDist_PIs[(CoastDist_PIs$PixelID %in% TINDVI_SS_PIs$PixelID),]
+Elevation_v1 <- Elevation_PIs[(Elevation_PIs$PixelID %in% TINDVI_SS_PIs$PixelID),]
+HumanMod_v1 <- HumanMod_PIs[(HumanMod_PIs$PixelID %in% TINDVI_SS_PIs$PixelID),]
+LandAge_v1 <- LandAge_PIs[(LandAge_PIs$PixelID %in% TINDVI_SS_PIs$PixelID),]
+MGSP_v1 <- MGSP_SS_PIs[(MGSP_SS_PIs$PixelID %in% TINDVI_SS_PIs$PixelID),]
+SFPO_v1 <- SFPO_SS_PIs[(SFPO_SS_PIs$PixelID %in% TINDVI_SS_PIs$PixelID),]
+SM_v1 <- SM_SS_PIs[(SM_SS_PIs$PixelID %in% TINDVI_SS_PIs$PixelID),]
+SubChem_v1 <- SubChem_PIs[(SubChem_PIs$PixelID %in% TINDVI_SS_PIs$PixelID),]
+SWI_v1 <- SWI_SS_PIs[(SWI_SS_PIs$PixelID %in% TINDVI_SS_PIs$PixelID),]
+ST_v1 <- SoilText_PIs[(SoilText_PIs$PixelID %in% TINDVI_SS_PIs$PixelID),]
+VegType_v1 <- VegType_PIs[(VegType_PIs$PixelID %in% TINDVI_SS_PIs$PixelID),]
+
+#Soil texture now has the fewest pixels (42,254)
+CoastDist_v2 <- CoastDist_v1[(CoastDist_v1$PixelID %in% ST_v1$PixelID),]
+Elevation_v2 <- Elevation_v1[(Elevation_v1$PixelID %in% ST_v1$PixelID),]
+HumanMod_v2 <- HumanMod_v1[(HumanMod_v1$PixelID %in% ST_v1$PixelID),]
+LandAge_v2 <- LandAge_v1[(LandAge_v1$PixelID %in% ST_v1$PixelID),]
+MGSP_v2 <- MGSP_v1[(MGSP_v1$PixelID %in% ST_v1$PixelID),]
+SFPO_v2 <- SFPO_v1[(SFPO_v1$PixelID %in% ST_v1$PixelID),]
+SM_v2 <- SM_v1[(SM_v1$PixelID %in% ST_v1$PixelID),]
+TINDVI_v2 <- TINDVI_SS_PIs[(TINDVI_SS_PIs$PixelID %in% ST_v1$PixelID),]
+SubChem_v2 <- SubChem_PIs[(SubChem_PIs$PixelID %in% ST_v1$PixelID),]
+SWI_v2 <- SWI_v1[(SWI_v1$PixelID %in% ST_v1$PixelID),]
+VegType_v2 <- VegType_v1[(VegType_v1$PixelID %in% ST_v1$PixelID),]
+
+#Elevation now has the fewest pixels (42,221)
+CoastDist_v3 <- CoastDist_v2[(CoastDist_v2$PixelID %in% Elevation_v2$PixelID),]
+HumanMod_v3 <- HumanMod_v2[(HumanMod_v2$PixelID %in% Elevation_v2$PixelID),]
+LandAge_v3 <- LandAge_v2[(LandAge_v2$PixelID %in% Elevation_v2$PixelID),]
+MGSP_v3 <- MGSP_v2[(MGSP_v2$PixelID %in% Elevation_v2$PixelID),]
+SFPO_v3 <- SFPO_v2[(SFPO_v2$PixelID %in% Elevation_v2$PixelID),]
+SM_v3 <- SM_v2[(SM_v2$PixelID %in% Elevation_v2$PixelID),]
+ST_v3 <- ST_v1[(ST_v1$PixelID %in% Elevation_v2$PixelID),]
+SubChem_v3 <- SubChem_v2[(SubChem_v2$PixelID %in% Elevation_v2$PixelID),]
+SWI_v3 <- SWI_v2[(SWI_v2$PixelID %in% Elevation_v2$PixelID),]
+TINDVI_v3 <- TINDVI_v2[(TINDVI_v2$PixelID %in% Elevation_v2$PixelID),]
+VegType_v3 <- VegType_v2[(VegType_v2$PixelID %in% Elevation_v2$PixelID),]
+
+#Veg type now has the fewest pixels (42,191)
+CoastDist_v4 <- CoastDist_v3[(CoastDist_v3$PixelID %in% VegType_v3$PixelID),]
+Elevation_v4 <- Elevation_v2[(Elevation_v2$PixelID %in% VegType_v3$PixelID),]
+HumanMod_v4 <- HumanMod_v3[(HumanMod_v3$PixelID %in% VegType_v3$PixelID),]
+LandAge_v4 <- LandAge_v3[(LandAge_v3$PixelID %in% VegType_v3$PixelID),]
+MGSP_v4 <- MGSP_v3[(MGSP_v3$PixelID %in% VegType_v3$PixelID),]
+SFPO_v4 <- SFPO_v3[(SFPO_v3$PixelID %in% VegType_v3$PixelID),]
+SM_v4 <- SM_v3[(SM_v3$PixelID %in% VegType_v3$PixelID),]
+ST_v4 <- ST_v3[(ST_v3$PixelID %in% VegType_v3$PixelID),]
+SubChem_v4 <- SubChem_v3[(SubChem_v3$PixelID %in% VegType_v3$PixelID),]
+SWI_v4 <- SWI_v3[(SWI_v3$PixelID %in% VegType_v3$PixelID),]
+TINDVI_v4 <- TINDVI_v3[(TINDVI_v3$PixelID %in% VegType_v3$PixelID),]
+
+#Human Mod now has the fewest pixels (298,980)
+CoastDist_v5 <- CoastDist_v4[(CoastDist_v4$PixelID %in% HumanMod_v4$PixelID),]
+Elevation_v5 <- Elevation_v4[(Elevation_v4$PixelID %in% HumanMod_v4$PixelID),]
+LandAge_v5 <- LandAge_v4[(LandAge_v4$PixelID %in% HumanMod_v4$PixelID),]
+MGSP_v5 <- MGSP_v4[(MGSP_v4$PixelID %in% HumanMod_v4$PixelID),]
+SFPO_v5 <- SFPO_v4[(SFPO_v4$PixelID %in% HumanMod_v4$PixelID),]
+SM_v5 <- SM_v4[(SM_v4$PixelID %in% HumanMod_v4$PixelID),]
+ST_v5 <- ST_v4[(ST_v4$PixelID %in% HumanMod_v4$PixelID),]
+SubChem_v5 <- SubChem_v4[(SubChem_v4$PixelID %in% HumanMod_v4$PixelID),]
+SWI_v5 <- SWI_v4[(SWI_v4$PixelID %in% HumanMod_v4$PixelID),]
+TINDVI_v5 <- TINDVI_v4[(TINDVI_v4$PixelID %in% HumanMod_v4$PixelID),]
+VegType_v5 <- VegType_v3[(VegType_v3$PixelID %in% HumanMod_v4$PixelID),]
+
+#Remove PixelID columns from the final datasets
+CoastDist_v5 <- subset(CoastDist_v5, select = -c(PixelID) )
+Elevation_v5 <- subset(Elevation_v5, select = -c(PixelID) )
+HumanMod_v4 <- subset(HumanMod_v4, select = -c(PixelID) )
+LandAge_v5 <- subset(LandAge_v5, select = -c(PixelID) )
+MGSP_v5 <- subset(MGSP_v5, select = -c(PixelID) )
+SFPO_v5 <- subset(SFPO_v5, select = -c(PixelID) )
+SM_v5 <- subset(SM_v5, select = -c(PixelID) )
+ST_v5 <- subset(ST_v5, select = -c(PixelID) )
+SubChem_v5 <- subset(SubChem_v5, select = -c(PixelID) )
+SWI_v5 <- subset(SWI_v5, select = -c(PixelID) )
+TINDVI_v5 <- subset(TINDVI_v5, select = -c(PixelID) )
+VegType_v5 <- subset(VegType_v5, select = -c(PixelID) )
+
+#Datasets now have same number of matching pixels. Combine into 1 dataframe and rename columns
+RFRinput <-cbind(TINDVI_v5, CoastDist_v5, Elevation_v5, HumanMod_v4, LandAge_v5, MGSP_v5, SFPO_v5, 
+                 SM_v5, ST_v5, SubChem_v5, SWI_v5, VegType_v5)
+
+#Rename columns for RFR export interpretation
+colnames(RFRinput)[6] <- "Precipitation"
+colnames(RFRinput)[7] <- "SnowFreeDate"
+colnames(RFRinput)[8] <- "SoilMoisture"
+colnames(RFRinput)[10] <- "SubstrateChem"
+colnames(RFRinput)[11] <- "SummerWarmth"
+colnames(RFRinput)[12] <- "VegUnit"
+
+####Determine outlier values
+#Precipitation
+summary(RFRinput$Precipitation)
+MGSP_IQR <- 0.34255 - -0.39857
+MGSP_LB <- -0.38594 - (1.5*MGSP_IQR)
+MGSP_UB <- 0.34255 + (1.5 *MGSP_IQR)
+
+boxplot(RFRinput$Precipitation,
+        ylab = "MGSP Sen's Slope"
+)
+
+Precip_neg <- RFRinput[(RFRinput$Precipitation < 0),]
+Precip_pos <- RFRinput[(RFRinput$Precipitation > 0),]
+
+#Elevation
+summary(RFRinput$Elevation)
+Elev_IQR <- 24.00 - 3.00
+Elev_LB <- 3.00 - (1.5*Elev_IQR)
+Elev_UB <- 24.00 + (1.5 *Elev_IQR)
+
+boxplot(RFRinput$Elevation,
+        ylab = "Elevation"
+)
+
+#Human mod
+summary(RFRinput$HumanMod)
+HM_IQR <- 0.02515 - 0.02515
+HM_LB <- 0.02515 - (1.5*HM_IQR)
+HM_UB <- 0.02515 + (1.5 *HM_IQR)
+
+boxplot(RFRinput$HumanMod,
+        ylab = "Human Modification"
+)
+
+summary(RFRinput$SummerWarmth)
+SWI_IQR <- 0.3089 - 0.1032
+SWI_LB <- 0.1032 - (1.5*SWI_IQR)
+SWI_UB <- 0.3089 + (1.5 *SWI_IQR)
+
+SWI_GTE05 <- RFRinput[(RFRinput$SummerWarmth >= 0.5),]
+SWI_GTE01 <- RFRinput[(RFRinput$SummerWarmth >= 0.1),]
+
+boxplot(RFRinput$SummerWarmth,
+                ylab = "SWI"
+)
+
+summary(RFRinput$SoilMoisture)
+SM_IQR <- -0.1505 - -1.3343
+SM_LB <- -1.3343 - (1.5*SM_IQR)
+SM_UB <- -0.1505 + (1.5 *SM_IQR)
+
+boxplot(RFRinput$SoilMoisture,
+        ylab = "SM Sen's Slope"
+)
+
+SM_GT0 <- RFRinput[(RFRinput$SoilMoisture > 0),]
+
+summary(RFRinput$TINDVI)
+TI_IQR <- 0.03482 - 0.01807
+TI_LB <- 0.01807- (1.5*TI_IQR)
+TI_UB <- 0.03482 + (1.5*TI_IQR)
+
+boxplot(RFRinput$TINDVI,
+        ylab = "TI-NDVI Sen's Slope"
+)
+
+# #Export as an R object and table
+saveRDS(RFRinput, file="RFRinput_TINDVI0.05_SigOnly_07Nov2023.RDS")
+write.table(RFRinput, file="RFRinput_TINDVI0.05_SigOnly_07Nov2023.csv", sep=",")
+
+#Run correlations between the discrete/continuous input variables to determine if any are highly correlated
+#Highly correlated if r > 0.75
+library(readxl)
+
+SlopesForCor <- read_excel("RFR_SigOnly/TI-NDVI/RFRinput_TINDVI0.05_SigOnly_07Nov2023.xlsx", 
+                           na = "NA")
+SlopesForCor <- data.matrix(SlopesForCor)
+SlopesForCor <- subset(SlopesForCor, select = -c(LandAge, SoilTexture, SubstrateChem, VegUnit) )
+
+library(psych)
+CorrResult <- corr.test(SlopesForCor, y = NULL, use = "pairwise", method = "spearman", adjust = "bonferroni",
+                        alpha = .05, ci = FALSE)
+
+pval <- CorrResult$p
